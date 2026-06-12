@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Cadeias de Markov</title>
+<meta name="description" content="Calcule a distribuição de uma cadeia de Markov após N gerações a partir de uma matriz de transição n×n.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F6F9; --surface:#FFFFFF; --surface-2:#EFF1F6;
+    --ink:#171B26; --ink-2:#4A5468; --ink-3:#8A93A6;
+    --line:#E2E5EC; --line-strong:#CBD0DB;
+    --brand:#4338CA; --brand-soft:#EAE8FB; --brand-ink:#312B9E;
+    --heat:245,158,11;
+    --ok:#0E8F5E; --ok-soft:#E0F3EC; --bad:#D33C3C; --bad-soft:#FBE7E7;
+    --radius:12px; --radius-sm:8px;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --sans:'Inter',system-ui,sans-serif;
+    --shadow:0 1px 2px rgba(20,26,40,.04),0 8px 24px rgba(20,26,40,.05);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0D0F14; --surface:#161A22; --surface-2:#1E232D;
+      --ink:#E7EAF0; --ink-2:#A4ADBF; --ink-3:#6B7488;
+      --line:#272D38; --line-strong:#39414F;
+      --brand:#8B83F0; --brand-soft:#241F45; --brand-ink:#C9C3FA;
+      --heat:251,191,36;
+      --ok:#3FCF8E; --ok-soft:#13332A; --bad:#F0696A; --bad-soft:#3A1E20;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.4);
+    }
+  }
+  [data-theme="light"]{
+    --bg:#F5F6F9; --surface:#FFFFFF; --surface-2:#EFF1F6; --ink:#171B26; --ink-2:#4A5468; --ink-3:#8A93A6;
+    --line:#E2E5EC; --line-strong:#CBD0DB; --brand:#4338CA; --brand-soft:#EAE8FB; --brand-ink:#312B9E;
+    --heat:245,158,11; --ok:#0E8F5E; --ok-soft:#E0F3EC; --bad:#D33C3C; --bad-soft:#FBE7E7;
+    --shadow:0 1px 2px rgba(20,26,40,.04),0 8px 24px rgba(20,26,40,.05);
+  }
+  [data-theme="dark"]{
+    --bg:#0D0F14; --surface:#161A22; --surface-2:#1E232D; --ink:#E7EAF0; --ink-2:#A4ADBF; --ink-3:#6B7488;
+    --line:#272D38; --line-strong:#39414F; --brand:#8B83F0; --brand-soft:#241F45; --brand-ink:#C9C3FA;
+    --heat:251,191,36; --ok:#3FCF8E; --ok-soft:#13332A; --bad:#F0696A; --bad-soft:#3A1E20;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;font-size:15px;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:28px 20px 80px}
+  a{color:var(--brand)}
+  /* header */
+  header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}
+  .title-block h1{font-size:23px;font-weight:700;letter-spacing:-.02em;margin:0 0 4px}
+  .title-block p{margin:0;color:var(--ink-2);font-size:14px;max-width:56ch}
+  .eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+  .theme-btn{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);
+    width:40px;height:40px;border-radius:var(--radius-sm);cursor:pointer;font-size:17px;
+    display:grid;place-items:center;transition:border-color .15s,color .15s}
+  .theme-btn:hover{border-color:var(--line-strong);color:var(--ink)}
+  /* cards */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;box-shadow:var(--shadow);margin-bottom:18px}
+  .card-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .card-head h2{font-size:15px;font-weight:600;margin:0}
+  .badge{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-3);
+    background:var(--surface-2);padding:2px 8px;border-radius:6px}
+  .grid-2{display:grid;grid-template-columns:1.35fr 1fr;gap:18px;align-items:start}
+  @media(max-width:760px){.grid-2{grid-template-columns:1fr}}
+  /* controls row */
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:12px;font-weight:600;color:var(--ink-2)}
+  select,input[type=number]{font-family:var(--sans);font-size:14px;color:var(--ink);
+    background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm);
+    padding:8px 10px;outline:none;transition:border-color .15s,box-shadow .15s}
+  select:focus,input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--radius-sm);overflow:hidden}
+  .seg button{border:none;background:var(--surface);color:var(--ink-2);font-family:var(--sans);
+    font-size:13px;font-weight:500;padding:8px 13px;cursor:pointer;transition:background .15s,color .15s}
+  .seg button[aria-pressed=true]{background:var(--brand);color:#fff}
+  .seg button:not(:last-child){border-right:1px solid var(--line-strong)}
+  /* matrix */
+  .matrix-scroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
+  table.mtx{border-collapse:separate;border-spacing:0;width:100%;min-width:max-content}
+  table.mtx th,table.mtx td{padding:0}
+  .corner{font-family:var(--mono);font-size:10px;color:var(--ink-3);text-align:right;
+    padding:0 8px 8px 0!important;font-weight:500;white-space:nowrap}
+  .col-head input,.row-head input{font-family:var(--sans);font-weight:600;font-size:12.5px;
+    color:var(--ink);background:transparent;border:1px solid transparent;border-radius:6px;
+    padding:5px 6px;width:88px;text-align:center;transition:background .15s,border-color .15s}
+  .row-head input{text-align:right;width:96px}
+  .col-head input:hover,.row-head input:hover{background:var(--surface-2)}
+  .col-head input:focus,.row-head input:focus{border-color:var(--brand);background:var(--surface)}
+  .row-head{padding-right:8px!important;white-space:nowrap}
+  .cell input{font-family:var(--mono);font-size:13.5px;font-weight:500;color:var(--ink);
+    background:var(--surface);border:1px solid var(--line);border-radius:7px;
+    width:62px;text-align:center;padding:9px 4px;margin:3px;
+    font-variant-numeric:tabular-nums;transition:border-color .15s,box-shadow .15s}
+  .cell input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);background:var(--surface)}
+  .rowsum{font-family:var(--mono);font-size:11.5px;font-weight:600;padding-left:10px!important;white-space:nowrap}
+  .rowsum .tick{display:inline-flex;align-items:center;gap:5px}
+  .rowsum.ok{color:var(--ok)} .rowsum.bad{color:var(--bad)}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .rowsum.ok .dot{background:var(--ok)} .rowsum.bad .dot{background:var(--bad)}
+  /* initial dist */
+  .pi-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .pi-item{display:flex;flex-direction:column;gap:4px;align-items:center}
+  .pi-item span{font-size:11.5px;font-weight:600;color:var(--ink-2);max-width:80px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pi-item input{font-family:var(--mono);font-size:13px;width:62px;text-align:center;padding:8px 4px;
+    border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);
+    font-variant-numeric:tabular-nums}
+  .pi-item input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);outline:none}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+  .chip{font-size:12px;font-weight:500;border:1px solid var(--line-strong);background:var(--surface);
+    color:var(--ink-2);border-radius:20px;padding:5px 11px;cursor:pointer;transition:all .15s}
+  .chip:hover{border-color:var(--brand);color:var(--brand)}
+  .pi-sum{font-family:var(--mono);font-size:12px;font-weight:600;margin-top:2px}
+  .pi-sum.ok{color:var(--ok)} .pi-sum.bad{color:var(--bad)}
+  /* primary button */
+  .btn{font-family:var(--sans);font-weight:600;font-size:15px;border:none;cursor:pointer;
+    border-radius:var(--radius-sm);padding:12px 18px;transition:transform .08s,filter .15s,opacity .15s}
+  .btn-primary{background:var(--brand);color:#fff;width:100%}
+  .btn-primary:hover{filter:brightness(1.07)} .btn:active{transform:translateY(1px)}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn-ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line-strong);
+    font-size:13px;font-weight:500;padding:7px 13px}
+  .btn-ghost:hover{border-color:var(--line-strong);color:var(--ink);background:var(--surface-2)}
+  .gen-field{margin:6px 0 14px}
+  .gen-field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+  .gen-field input{width:100%}
+  /* results */
+  #results{margin-top:4px}
+  .res-table-scroll{overflow-x:auto;margin:0 -4px;padding:4px}
+  table.res{border-collapse:separate;border-spacing:0;width:100%;min-width:max-content;font-variant-numeric:tabular-nums}
+  table.res th,table.res td{padding:9px 12px;text-align:right;font-size:13.5px;border-bottom:1px solid var(--line)}
+  table.res thead th{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-3);
+    text-transform:uppercase;letter-spacing:.05em;text-align:right;border-bottom:1px solid var(--line-strong)}
+  table.res thead th:first-child,table.res td.gen-label{text-align:left}
+  table.res td{font-family:var(--mono);font-weight:500;position:relative}
+  td.gen-label{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);font-weight:600;white-space:nowrap}
+  tr.converged td.gen-label::after{content:"≈ estável";font-size:10px;color:var(--ok);
+    background:var(--ok-soft);padding:1px 6px;border-radius:5px;margin-left:8px;font-weight:600}
+  tr.gen0 td{color:var(--ink-2)}
+  .note{font-size:13px;color:var(--ink-2);margin:14px 0 0;line-height:1.6}
+  .note strong{color:var(--ink);font-weight:600}
+  .stat-box{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-sm);
+    padding:12px 14px;margin-top:14px;font-size:13.5px}
+  .stat-box .label{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+  .stat-vals{font-family:var(--mono);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+  details{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+  summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--brand);list-style:none;
+    display:flex;align-items:center;gap:7px}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸";transition:transform .15s;font-size:11px}
+  details[open] summary::before{transform:rotate(90deg)}
+  .pmtx-wrap{overflow-x:auto;margin-top:12px}
+  table.pmtx{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
+  table.pmtx td,table.pmtx th{padding:8px 10px;font-size:12.5px;text-align:center;font-family:var(--mono)}
+  table.pmtx th{font-weight:600;font-size:11px;color:var(--ink-2)}
+  table.pmtx td.lab{font-weight:600;color:var(--ink-2);text-align:right}
+  .res-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .view-toggle{margin-bottom:6px}
+  .gen-blocks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px}
+  .gen-block{border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 12px 6px;background:var(--surface-2)}
+  .gen-block.converged{border-color:var(--ok)}
+  .gen-block-head{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:9px;
+    display:flex;align-items:center;gap:7px}
+  .gen-block-head span{color:var(--ink-3);font-weight:500;font-size:11.5px}
+  .gen-block .pmtx{width:100%}
+  .gen-block .pmtx td,.gen-block .pmtx th{padding:6px 7px;font-size:12px}
+  .import-box{margin-top:14px}
+  .import-box summary{font-size:13px}
+  .import-box textarea{width:100%;font-family:var(--mono);font-size:13px;color:var(--ink);
+    background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius-sm);
+    padding:10px;margin:8px 0;resize:vertical;min-height:84px}
+  .import-box textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+  .empty{color:var(--ink-3);font-size:14px;text-align:center;padding:30px 10px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--bg);font-size:13px;font-weight:500;padding:10px 18px;
+    border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .helpline{font-size:12.5px;color:var(--ink-3);margin:10px 0 0;line-height:1.55}
+  kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:4px;padding:1px 5px}
+  footer{margin-top:34px;text-align:center;font-size:12.5px;color:var(--ink-3);line-height:1.7}
+  footer code{font-family:var(--mono);background:var(--surface);border:1px solid var(--line);
+    padding:1px 6px;border-radius:5px;font-size:11.5px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="title-block">
+      <div class="eyebrow">Cadeias de Markov · tempo discreto</div>
+      <h1>Calculadora de distribuição por geração</h1>
+      <p>Monte a matriz de transição, defina onde o sistema começa e veja a distribuição depois de quantas gerações você quiser. Aceita qualquer número de estados.</p>
+    </div>
+    <button class="theme-btn" id="themeBtn" aria-label="Alternar tema claro/escuro" title="Tema claro/escuro">◐</button>
+  </header>
+
+  <!-- SETUP -->
+  <div class="card">
+    <div class="controls">
+      <div class="field">
+        <label for="nStates">Número de estados</label>
+        <select id="nStates">
+          <option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Os valores estão em</label>
+        <div class="seg" role="group" aria-label="Modo dos valores">
+          <button id="modeDec" aria-pressed="true">decimal (0–1)</button>
+          <button id="modePct" aria-pressed="false">porcentagem (%)</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="preset">Carregar exemplo</label>
+        <select id="preset">
+          <option value="">— escolher —</option>
+          <option value="tempo">Tempo / chuva (2 estados)</option>
+          <option value="empresas">Empresas A · B · C (3 estados)</option>
+          <option value="bikes">Bicicletas Centro · Orla · Parque</option>
+          <option value="absorvente">Passeio aleatório com absorção (5 estados)</option>
+        </select>
+      </div>
+    </div>
+    <p class="helpline">Pode digitar com vírgula ou ponto (<kbd>0,7</kbd> ou <kbd>0.7</kbd>). Cada <strong>linha</strong> é "estado de origem" e precisa somar 1 (ou 100%). O ponto verde/vermelho ao lado de cada linha confere isso pra você.</p>
+  </div>
+
+  <div class="grid-2">
+    <!-- MATRIX -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Matriz de transição</h2>
+        <span class="badge">linha = de · coluna = para</span>
+      </div>
+      <div class="matrix-scroll">
+        <table class="mtx" id="mtxTable"></table>
+      </div>
+      <div class="res-actions">
+        <button class="btn btn-ghost" id="fillBtn" title="Preenche a última coluna de cada linha para fechar a soma">Completar última coluna</button>
+        <button class="btn btn-ghost" id="clearBtn">Zerar matriz</button>
+      </div>
+      <details class="import-box">
+        <summary>Importar / colar uma matriz</summary>
+        <p class="helpline" style="margin-top:8px">Cole uma linha por linha (direto do Excel, ou separando por espaço, vírgula ou tab). Ex.: <kbd>0.7 0.3</kbd> numa linha e <kbd>0.4 0.6</kbd> na outra. Eu detecto sozinho se está em % ou decimal e ajusto o nº de estados.</p>
+        <textarea id="importText" rows="4" placeholder="0.7  0.3&#10;0.4  0.6"></textarea>
+        <button class="btn btn-ghost" id="importBtn">Carregar do texto</button>
+      </details>
+    </div>
+
+    <!-- INITIAL + RUN -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Distribuição inicial</h2>
+        <span class="badge" id="piMode">π₀</span>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="pi-row" id="piRow"></div>
+      <div class="pi-sum" id="piSum"></div>
+
+      <div class="gen-field">
+        <label for="gens">Calcular até a geração</label>
+        <input type="number" id="gens" min="1" max="200" value="8">
+      </div>
+      <button class="btn btn-primary" id="runBtn">Calcular</button>
+      <p class="helpline" style="margin-top:12px">Os "atalhos" acima põem 100% num único estado de partida — útil pra perguntas como "se chover hoje…".</p>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="card" id="resultsCard">
+    <div class="card-head">
+      <h2>Resultado</h2>
+      <span class="badge">πₖ = π₀ · Pᵏ</span>
+    </div>
+    <div id="results"><p class="empty">Preencha a matriz e clique em <strong>Calcular</strong>.</p></div>
+  </div>
+
+  <footer>
+    Feito por Kaike Martins · ferramenta de estudo de cadeias de Markov<br>
+    Convenção: matriz estocástica por linhas, vetor de estado à esquerda (<code>π·P</code>).
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var state = { n:2, mode:'dec', labels:[], P:[], pi:[] };
+  var TOL = 1e-6;     // validação de soma de linha
+  var CONV = 1e-4;    // "estável até a 4ª casa decimal"
+  var lastResult=null, currentView='matrix';
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------- helpers ---------- */
+  function parseNum(str){
+    if(str==null) return NaN;
+    var s = String(str).trim().replace(',', '.');
+    if(s==='') return NaN;
+    var v = parseFloat(s);
+    return isNaN(v) ? NaN : v;
+  }
+  // returns probability in [0,1] from a raw cell respecting mode
+  function toProb(raw){
+    var v = parseNum(raw);
+    if(isNaN(v)) return 0;
+    return state.mode==='pct' ? v/100 : v;
+  }
+  function fmt(p){ // p is a probability 0..1 -> string in current display? always show decimal 4dp for results
+    return (Math.round(p*1e6)/1e6).toFixed(4);
+  }
+  function fmtPct(p){ return (Math.round(p*1e4)/100).toFixed(2)+'%'; }
+
+  function defaultLabels(n){
+    var base = ['A','B','C','D','E','F','G','H','I','J'];
+    var out=[]; for(var i=0;i<n;i++) out.push('Estado '+base[i]);
+    return out;
+  }
+  function fmt2(x){ return (Math.round(x*100)/100).toFixed(2); }
+
+  /* ---------- build / read matrix UI ---------- */
+  function buildMatrix(){
+    var n = state.n, t = $('mtxTable');
+    t.innerHTML='';
+    // header row
+    var thead = document.createElement('thead');
+    var hr = document.createElement('tr');
+    var corner = document.createElement('th');
+    corner.className='corner'; corner.textContent='de \\ para';
+    hr.appendChild(corner);
+    for(var j=0;j<n;j++){
+      var th=document.createElement('th'); th.className='col-head';
+      var inp=document.createElement('input'); inp.type='text'; inp.value=state.labels[j];
+      inp.setAttribute('aria-label','Nome do estado '+(j+1));
+      (function(idx){ inp.addEventListener('input',function(){ state.labels[idx]=inp.value; syncLabels(); }); })(j);
+      th.appendChild(inp); hr.appendChild(th);
+    }
+    hr.appendChild(document.createElement('th')); // for rowsum col
+    thead.appendChild(hr); t.appendChild(thead);
+
+    var tb=document.createElement('tbody');
+    for(var i=0;i<n;i++){
+      var tr=document.createElement('tr');
+      var rh=document.createElement('td'); rh.className='row-head';
+      var rinp=document.createElement('input'); rinp.type='text'; rinp.value=state.labels[i];
+      rinp.setAttribute('aria-label','Nome do estado '+(i+1));
+      (function(idx){ rinp.addEventListener('input',function(){ state.labels[idx]=rinp.value; syncLabels(); }); })(i);
+      rh.appendChild(rinp); tr.appendChild(rh);
+      for(var j=0;j<n;j++){
+        var td=document.createElement('td'); td.className='cell';
+        var ci=document.createElement('input'); ci.type='text'; ci.inputMode='decimal';
+        ci.value=state.P[i][j];
+        ci.setAttribute('aria-label','Transição de '+state.labels[i]+' para '+state.labels[j]);
+        (function(ri,cj,el){
+          el.addEventListener('input',function(){ state.P[ri][cj]=el.value; tintCell(el,ri,cj); updateRowSum(ri); });
+        })(i,j,ci);
+        td.appendChild(ci); tr.appendChild(td);
+        tintCell(ci,i,j);
+      }
+      var rs=document.createElement('td'); rs.className='rowsum'; rs.id='rowsum-'+i;
+      tr.appendChild(rs);
+      tb.appendChild(tr);
+    }
+    t.appendChild(tb);
+    for(var k=0;k<n;k++) updateRowSum(k);
+  }
+
+  function tintCell(el,i,j){
+    var p = toProb(state.P[i][j]);
+    if(p<0) p=0; if(p>1) p=1;
+    var a = Math.min(0.62, p*0.62);
+    el.style.backgroundColor = 'rgba('+getComputedStyle(document.documentElement).getPropertyValue('--heat').trim()+','+a+')';
+  }
+  function retintAll(){
+    for(var i=0;i<state.n;i++) for(var j=0;j<state.n;j++){
+      var cell = document.querySelectorAll('#mtxTable tbody tr')[i].querySelectorAll('.cell input')[j];
+      if(cell) tintCell(cell,i,j);
+    }
+  }
+  function updateRowSum(i){
+    var sum=0; for(var j=0;j<state.n;j++) sum+=toProb(state.P[i][j]);
+    var el=$('rowsum-'+i); if(!el) return;
+    var ok = Math.abs(sum-1)<TOL;
+    el.className='rowsum '+(ok?'ok':'bad');
+    var shown = state.mode==='pct' ? (Math.round(sum*1e4)/100).toFixed(0)+'%' : (Math.round(sum*1e6)/1e6).toFixed(3);
+    el.innerHTML='<span class="tick"><span class="dot"></span>'+(ok?'soma '+shown:'soma '+shown)+'</span>';
+  }
+
+  function syncLabels(){
+    // update header inputs + row-head inputs + chips + pi labels to match
+    var heads = document.querySelectorAll('#mtxTable .col-head input');
+    var rows = document.querySelectorAll('#mtxTable .row-head input');
+    for(var j=0;j<state.n;j++){ if(heads[j] && heads[j].value!==state.labels[j]) heads[j].value=state.labels[j];
+      if(rows[j] && rows[j].value!==state.labels[j]) rows[j].value=state.labels[j]; }
+    buildChips(); buildPi(true);
+  }
+
+  /* ---------- initial distribution ---------- */
+  function buildChips(){
+    var c=$('chips'); c.innerHTML='';
+    for(var i=0;i<state.n;i++){
+      (function(idx){
+        var b=document.createElement('button'); b.className='chip';
+        b.textContent='começa em '+state.labels[idx];
+        b.addEventListener('click',function(){ setPiOneHot(idx); });
+        c.appendChild(b);
+      })(i);
+    }
+    var u=document.createElement('button'); u.className='chip'; u.textContent='uniforme';
+    u.addEventListener('click',setPiUniform); c.appendChild(u);
+  }
+  function setPiOneHot(idx){
+    for(var i=0;i<state.n;i++) state.pi[i] = (i===idx) ? (state.mode==='pct'?'100':'1') : '0';
+    buildPi(); updatePiSum();
+  }
+  function setPiUniform(){
+    var val = state.mode==='pct' ? (100/state.n) : (1/state.n);
+    var s = state.mode==='pct' ? (Math.round(val*100)/100).toString() : (Math.round(val*1e4)/1e4).toString();
+    for(var i=0;i<state.n;i++) state.pi[i]=s;
+    buildPi(); updatePiSum();
+  }
+  function buildPi(keepValues){
+    var r=$('piRow'); r.innerHTML='';
+    for(var i=0;i<state.n;i++){
+      var item=document.createElement('div'); item.className='pi-item';
+      var lab=document.createElement('span'); lab.textContent=state.labels[i]; lab.title=state.labels[i];
+      var inp=document.createElement('input'); inp.type='text'; inp.inputMode='decimal';
+      inp.value = state.pi[i]!=null ? state.pi[i] : (state.mode==='pct'?'0':'0');
+      inp.setAttribute('aria-label','Probabilidade inicial de '+state.labels[i]);
+      (function(idx,el){ el.addEventListener('input',function(){ state.pi[idx]=el.value; updatePiSum(); }); })(i,inp);
+      item.appendChild(lab); item.appendChild(inp); r.appendChild(item);
+    }
+    updatePiSum();
+  }
+  function piProb(i){
+    var v=parseNum(state.pi[i]); if(isNaN(v)) v=0;
+    return state.mode==='pct'? v/100 : v;
+  }
+  function updatePiSum(){
+    var s=0; for(var i=0;i<state.n;i++) s+=piProb(i);
+    var ok=Math.abs(s-1)<TOL;
+    var el=$('piSum');
+    var shown = state.mode==='pct'?(Math.round(s*1e4)/100).toFixed(0)+'%':(Math.round(s*1e6)/1e6).toFixed(3);
+    el.className='pi-sum '+(ok?'ok':'bad');
+    el.textContent = ok ? 'soma '+shown+' ✓' : 'soma '+shown+' — precisa fechar em '+(state.mode==='pct'?'100%':'1');
+  }
+
+  /* ---------- linear algebra ---------- */
+  function readMatrix(){
+    var P=[]; for(var i=0;i<state.n;i++){ var row=[]; for(var j=0;j<state.n;j++) row.push(toProb(state.P[i][j])); P.push(row);} return P;
+  }
+  function matMul(A,B){
+    var n=A.length,m=B[0].length,k=B.length,C=[];
+    for(var i=0;i<n;i++){ C[i]=[]; for(var j=0;j<m;j++){ var s=0; for(var t=0;t<k;t++) s+=A[i][t]*B[t][j]; C[i][j]=s; } }
+    return C;
+  }
+  function vecMat(v,M){
+    var n=M.length,m=M[0].length,out=[];
+    for(var j=0;j<m;j++){ var s=0; for(var i=0;i<n;i++) s+=v[i]*M[i][j]; out[j]=s; } return out;
+  }
+  function identity(n){ var I=[]; for(var i=0;i<n;i++){ I[i]=[]; for(var j=0;j<n;j++) I[i][j]=(i===j)?1:0; } return I; }
+  function maxDiff(a,b){ var d=0; for(var i=0;i<a.length;i++) d=Math.max(d,Math.abs(a[i]-b[i])); return d; }
+
+  // Gauss-Jordan inverse; returns null if singular
+  function invert(M){
+    var n=M.length, A=[];
+    for(var i=0;i<n;i++){ A[i]=M[i].slice(); for(var j=0;j<n;j++) A[i].push(i===j?1:0); }
+    for(var col=0;col<n;col++){
+      var piv=col;
+      for(var r=col+1;r<n;r++) if(Math.abs(A[r][col])>Math.abs(A[piv][col])) piv=r;
+      if(Math.abs(A[piv][col])<1e-12) return null;
+      var tmp=A[col]; A[col]=A[piv]; A[piv]=tmp;
+      var d=A[col][col];
+      for(var k=0;k<2*n;k++) A[col][k]/=d;
+      for(var r2=0;r2<n;r2++){ if(r2===col) continue; var f=A[r2][col];
+        if(f!==0) for(var k2=0;k2<2*n;k2++) A[r2][k2]-=f*A[col][k2]; }
+    }
+    var inv=[]; for(var i2=0;i2<n;i2++) inv[i2]=A[i2].slice(n,2*n);
+    return inv;
+  }
+
+  // Absorbing-chain analysis: fundamental matrix, expected steps, absorption probabilities
+  function analyzeAbsorbing(P){
+    var n=P.length, absorbing=[], transient=[];
+    for(var i=0;i<n;i++){ if(Math.abs(P[i][i]-1)<1e-9) absorbing.push(i); else transient.push(i); }
+    if(absorbing.length===0 || transient.length===0) return null;
+    var t=transient.length, r=absorbing.length, Q=[], R=[];
+    for(var a=0;a<t;a++){ Q[a]=[]; R[a]=[];
+      for(var b=0;b<t;b++) Q[a][b]=P[transient[a]][transient[b]];
+      for(var c=0;c<r;c++) R[a][c]=P[transient[a]][absorbing[c]];
+    }
+    var ImQ=[]; for(var i3=0;i3<t;i3++){ ImQ[i3]=[]; for(var j3=0;j3<t;j3++) ImQ[i3][j3]=(i3===j3?1:0)-Q[i3][j3]; }
+    var N=invert(ImQ);
+    if(!N) return { transient:transient, absorbing:absorbing, singular:true };
+    var exp=[]; for(var i4=0;i4<t;i4++){ var s=0; for(var j4=0;j4<t;j4++) s+=N[i4][j4]; exp[i4]=s; }
+    var B=matMul(N,R);
+    return { transient:transient, absorbing:absorbing, N:N, exp:exp, B:B, singular:false };
+  }
+
+  /* ---------- run ---------- */
+  function validate(P){
+    var problems=[];
+    for(var i=0;i<state.n;i++){ var s=0; for(var j=0;j<state.n;j++) s+=P[i][j];
+      if(Math.abs(s-1)>1e-4) problems.push(state.labels[i]); }
+    return problems;
+  }
+
+  function run(){
+    var P=readMatrix();
+    var bad=validate(P);
+    if(bad.length) toast('Linha(s) que não somam 1: '+bad.join(', '));
+    var pi0=[]; for(var i=0;i<state.n;i++) pi0.push(piProb(i));
+    var piSum=pi0.reduce(function(a,b){return a+b;},0);
+    var piGiven = Math.abs(piSum-1)<1e-4;
+
+    var G=Math.max(1,Math.min(200,parseInt($('gens').value,10)||8));
+
+    // sequência de distribuições a partir de π₀
+    var seq=[pi0.slice()], cur=pi0.slice(), convAt=-1;
+    for(var g=1;g<=G;g++){ var nxt=vecMat(cur,P); seq.push(nxt.slice());
+      if(convAt<0 && maxDiff(nxt,cur)<CONV) convAt=g; cur=nxt; }
+
+    // potências P^k para k = 0..G (matriz completa por geração)
+    var powers=[identity(state.n)];
+    for(var g2=1;g2<=G;g2++) powers.push(matMul(powers[g2-1],P));
+
+    // geração em que a matriz inteira estabiliza
+    var matConvAt=-1;
+    for(var g3=1;g3<=G;g3++){ if(matConvAt<0 && maxDiff(flat(powers[g3]),flat(powers[g3-1]))<CONV) matConvAt=g3; }
+
+    // distribuição de equilíbrio (iteração de potência a partir do uniforme)
+    var statOk=false, u=[]; for(var i2=0;i2<state.n;i2++) u.push(1/state.n);
+    var prev=u.slice();
+    for(var it=0;it<8000;it++){ var nx=vecMat(prev,P); if(maxDiff(nx,prev)<1e-13){ statOk=true; prev=nx; break;} prev=nx; }
+    if(!statOk) statOk = maxDiff(vecMat(prev,P),prev)<1e-7;
+
+    // cadeia absorvente?
+    var absorb = analyzeAbsorbing(P);
+
+    lastResult={ seq:seq, powers:powers, convAt:convAt, matConvAt:matConvAt,
+                 stat:prev, statOk:statOk, G:G, labels:state.labels.slice(), piGiven:piGiven, absorb:absorb };
+    renderResults();
+  }
+  function flat(M){ var o=[]; for(var i=0;i<M.length;i++) for(var j=0;j<M[i].length;j++) o.push(M[i][j]); return o; }
+
+  function renderResults(){
+    if(!lastResult) return;
+    var r=lastResult, L=r.labels, n=L.length, html='';
+    html+='<div class="seg view-toggle" role="group" aria-label="Tipo de visualização">'
+      +'<button data-view="matrix" aria-pressed="'+(currentView==='matrix')+'">Matriz completa por geração</button>'
+      +'<button data-view="vector" aria-pressed="'+(currentView==='vector')+'">A partir de π₀</button>'
+      +'</div>';
+
+    if(currentView==='vector'){
+      if(!r.piGiven) html+='<p class="note" style="margin-top:14px">A distribuição inicial não soma 1, então esta visão pode não fazer sentido — use a aba <strong>Matriz completa</strong> ou ajuste π₀.</p>';
+      html+=vectorTable(r,L,n);
+      html+=convNote(r.convAt,r.G,'a distribuição');
+    } else {
+      html+=matrixBlocks(r,L,n);
+      html+=convNote(r.matConvAt,r.G,'a matriz');
+    }
+    if(r.absorb) html+=absorbBox(r,L);
+    else if(r.statOk) html+=statBox(r,L,n);
+    html+='<div class="res-actions"><button class="btn btn-ghost" id="copyBtn">Copiar '+(currentView==='vector'?'tabela':'matrizes')+'</button></div>';
+
+    $('results').innerHTML=html;
+    var vt=$('results').querySelectorAll('.view-toggle button');
+    Array.prototype.forEach.call(vt,function(b){ b.addEventListener('click',function(){ currentView=b.getAttribute('data-view'); renderResults(); }); });
+    var cb=$('copyBtn'); if(cb) cb.addEventListener('click',copyCurrent);
+  }
+
+  function vectorTable(r,L,n){
+    var seq=r.seq, html='<div class="res-table-scroll"><table class="res"><thead><tr><th>Geração</th>';
+    for(var j=0;j<n;j++) html+='<th>'+escapeHtml(L[j])+'</th>';
+    html+='</tr></thead><tbody>';
+    for(var g=0;g<seq.length;g++){
+      var cls=''; if(g===0)cls+=' gen0'; if(r.convAt>=0&&g===r.convAt)cls+=' converged';
+      html+='<tr class="'+cls.trim()+'"><td class="gen-label">'+(g===0?'π₀ (hoje)':'π'+sub(g))+'</td>';
+      for(var j2=0;j2<n;j2++){ var p=seq[g][j2]; var a=Math.min(0.5,Math.max(0,p)*0.5);
+        html+='<td style="background:rgba('+heatVar()+','+a+')">'+fmt(p)+'</td>'; }
+      html+='</tr>';
+    }
+    return html+'</tbody></table></div>';
+  }
+
+  function matrixBlocks(r,L,n){
+    var html='<p class="note" style="margin-top:14px">Cada bloco é a matriz Pᵏ daquela geração: a <strong>linha</strong> é o estado de partida e a <strong>coluna</strong> onde ele estará depois de k gerações. Mesmo formato da sua planilha — todas as linhas de cada geração.</p>';
+    html+='<div class="gen-blocks">';
+    for(var k=1;k<=r.G;k++){
+      var M=r.powers[k], conv=(r.matConvAt>=0 && k===r.matConvAt);
+      html+='<div class="gen-block'+(conv?' converged':'')+'"><div class="gen-block-head">Geração '+k+' <span>P'+supn(k)+'</span></div>';
+      html+='<div class="pmtx-wrap"><table class="pmtx"><thead><tr><th></th>';
+      for(var c=0;c<n;c++) html+='<th>'+escapeHtml(L[c])+'</th>';
+      html+='</tr></thead><tbody>';
+      for(var i=0;i<n;i++){ html+='<tr><td class="lab">'+escapeHtml(L[i])+'</td>';
+        for(var j=0;j<n;j++){ var p=M[i][j]; var a=Math.min(0.5,Math.max(0,p)*0.5);
+          html+='<td style="background:rgba('+heatVar()+','+a+')">'+fmt(p)+'</td>'; }
+        html+='</tr>'; }
+      html+='</tbody></table></div></div>';
+    }
+    return html+'</div>';
+  }
+
+  function convNote(at,G,what){
+    if(at>=0) return '<p class="note"><strong>'+cap(what)+' estabiliza na geração '+at+'</strong> (igual até a 4ª casa decimal). A partir daí o ponto de partida deixa de importar.</p>';
+    return '<p class="note">Em '+G+' gerações '+what+' ainda não estabilizou até a 4ª casa. Aumente o número de gerações, ou a cadeia pode ser periódica (alterna sem assentar).</p>';
+  }
+  function statBox(r,L,n){
+    var sv=[], mr=[];
+    for(var k=0;k<n;k++){ sv.push(escapeHtml(L[k])+' = '+fmt(r.stat[k])+' ('+fmtPct(r.stat[k])+')');
+      if(r.stat[k]>1e-9) mr.push(escapeHtml(L[k])+' ≈ '+fmt2(1/r.stat[k])); }
+    return '<div class="stat-box"><div class="label">Distribuição no equilíbrio (cadeia regular)</div>'
+        +'<div class="stat-vals">'+sv.join('&nbsp; · &nbsp;')+'</div></div>'
+        +'<div class="stat-box"><div class="label">Tempo médio de retorno (1 / πᵢ)</div>'
+        +'<div class="stat-vals">'+mr.join('&nbsp; · &nbsp;')+'</div></div>';
+  }
+
+  function absorbBox(r,L){
+    var ab=r.absorb, A=ab.absorbing, html='';
+    html+='<div class="stat-box"><div class="label">Cadeia com estados absorventes</div>'
+       +'<div class="stat-vals">Absorventes: '+A.map(function(i){return escapeHtml(L[i]);}).join(', ')+'</div></div>';
+    if(ab.singular){
+      html+='<p class="note">Há absorvente(s), mas algum estado transitório não consegue alcançar a absorção, então não dá pra calcular tempo nem probabilidade de absorção (a matriz I−Q é singular). Verifique a matriz.</p>';
+      return html;
+    }
+    var T=ab.transient;
+    html+='<details open><summary>Tempo médio até a absorção (por estado de partida)</summary>'
+       +'<div class="pmtx-wrap"><table class="pmtx"><thead><tr><th>Partindo de</th><th>Passos médios</th></tr></thead><tbody>';
+    for(var a=0;a<T.length;a++) html+='<tr><td class="lab">'+escapeHtml(L[T[a]])+'</td><td>'+fmt2(ab.exp[a])+'</td></tr>';
+    html+='</tbody></table></div></details>';
+    html+='<details open><summary>Probabilidade de ser absorvido em cada estado final</summary>'
+       +'<div class="pmtx-wrap"><table class="pmtx"><thead><tr><th>De \\ absorve em</th>';
+    for(var c=0;c<A.length;c++) html+='<th>'+escapeHtml(L[A[c]])+'</th>';
+    html+='</tr></thead><tbody>';
+    for(var a2=0;a2<T.length;a2++){ html+='<tr><td class="lab">'+escapeHtml(L[T[a2]])+'</td>';
+      for(var c2=0;c2<A.length;c2++){ var p=ab.B[a2][c2]; var al=Math.min(0.5,Math.max(0,p)*0.5);
+        html+='<td style="background:rgba('+heatVar()+','+al+')">'+fmt(p)+'</td>'; }
+      html+='</tr>'; }
+    html+='</tbody></table></div></details>';
+    html+='<p class="helpline" style="margin-top:10px">Estado absorvente = linha com 1 na própria diagonal (uma vez lá, não sai). A ferramenta detecta sozinha e usa a matriz fundamental N=(I−Q)⁻¹.</p>';
+    return html;
+  }
+  function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+  function supn(num){ var m={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+    return String(num).split('').map(function(d){return m[d]||d;}).join(''); }
+
+  function copyCurrent(){
+    if(!lastResult) return;
+    var r=lastResult, L=r.labels, lines=[], txt;
+    if(currentView==='vector'){
+      lines.push('Geracao\t'+L.join('\t'));
+      for(var g=0;g<r.seq.length;g++){ var row=[g===0?'pi0':'pi'+g];
+        for(var j=0;j<r.seq[g].length;j++) row.push(fmt(r.seq[g][j]).replace('.',',')); lines.push(row.join('\t')); }
+    } else {
+      for(var k=1;k<=r.G;k++){ lines.push('Geracao '+k); lines.push('de\\para\t'+L.join('\t'));
+        var M=r.powers[k];
+        for(var i=0;i<L.length;i++){ var row=[L[i]];
+          for(var j2=0;j2<L.length;j2++) row.push(fmt(M[i][j2]).replace('.',',')); lines.push(row.join('\t')); }
+        lines.push(''); }
+    }
+    txt=lines.join('\n');
+    navigator.clipboard && navigator.clipboard.writeText(txt).then(
+      function(){ toast('Copiado — cola no Excel/Sheets.'); },
+      function(){ toast('Não consegui copiar.'); });
+  }
+
+  /* ---------- small utils ---------- */
+  function heatVar(){ return getComputedStyle(document.documentElement).getPropertyValue('--heat').trim(); }
+  function sub(n){ var m={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};
+    return String(n).split('').map(function(d){return m[d]||d;}).join(''); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  var toastTimer;
+  function toast(msg){ var t=$('toast'); t.textContent=msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove('show');},2800); }
+
+  /* ---------- state size / mode ---------- */
+  function setN(n){
+    var old=state.n; state.n=n;
+    // resize labels
+    var dl=defaultLabels(n);
+    var newLabels=[]; for(var i=0;i<n;i++) newLabels.push(state.labels[i]!=null?state.labels[i]:dl[i]);
+    state.labels=newLabels;
+    // resize P
+    var P=[]; for(var i=0;i<n;i++){ var row=[]; for(var j=0;j<n;j++){ row.push((state.P[i]&&state.P[i][j]!=null)?state.P[i][j]:'0'); } P.push(row);} state.P=P;
+    // resize pi
+    var pi=[]; for(var i=0;i<n;i++) pi.push(state.pi[i]!=null?state.pi[i]:'0'); state.pi=pi;
+    buildMatrix(); buildChips(); buildPi();
+  }
+
+  function setMode(mode){
+    if(mode===state.mode) return;
+    // convert existing numeric strings between decimal and percent
+    function conv(s){ var v=parseNum(s); if(isNaN(v)) return s;
+      var nv = mode==='pct' ? v*100 : v/100;
+      nv = Math.round(nv*1e6)/1e6; return String(nv); }
+    for(var i=0;i<state.n;i++){ for(var j=0;j<state.n;j++) state.P[i][j]=conv(state.P[i][j]); state.pi[i]=conv(state.pi[i]); }
+    state.mode=mode;
+    $('modeDec').setAttribute('aria-pressed', mode==='dec');
+    $('modePct').setAttribute('aria-pressed', mode==='pct');
+    $('piMode').textContent = mode==='pct' ? 'π₀ em %' : 'π₀';
+    buildMatrix(); buildPi(); retintAll();
+  }
+
+  /* ---------- import / paste ---------- */
+  function importMatrix(){
+    var raw=($('importText').value||'').trim();
+    if(!raw){ toast('Cole uma matriz primeiro.'); return; }
+    var rows=raw.split(/\r?\n/).map(function(l){return l.trim();}).filter(function(l){return l.length;});
+    var parsed=[], cols=-1, ok=true;
+    for(var i=0;i<rows.length;i++){
+      var parts=rows[i].split(/[\s,;]+/).filter(function(x){return x.length;});
+      var nums=parts.map(function(p){ return parseNum(p); });
+      if(nums.some(function(x){return isNaN(x);})){ ok=false; break; }
+      if(cols<0) cols=nums.length;
+      if(nums.length!==cols){ ok=false; break; }
+      parsed.push(nums);
+    }
+    if(!ok){ toast('Não consegui ler. Use uma linha por linha da matriz, números separados por espaço, vírgula ou tab.'); return; }
+    var n=parsed.length;
+    if(n!==cols){ toast('A matriz precisa ser quadrada. Li '+n+' linha(s) × '+cols+' coluna(s).'); return; }
+    if(n<2 || n>10){ toast('Suporta de 2 a 10 estados (li '+n+').'); return; }
+    // detecta modo pela média das somas de linha (≈100 => %, ≈1 => decimal)
+    var avg=0; for(var a=0;a<n;a++){ var s=0; for(var b=0;b<n;b++) s+=parsed[a][b]; avg+=s; } avg/=n;
+    var mode = avg>5 ? 'pct' : 'dec';
+    state.mode=mode;
+    $('modeDec').setAttribute('aria-pressed', mode==='dec');
+    $('modePct').setAttribute('aria-pressed', mode==='pct');
+    $('piMode').textContent = mode==='pct' ? 'π₀ em %' : 'π₀';
+    state.n=n; $('nStates').value=n;
+    state.labels=defaultLabels(n);
+    state.P=parsed.map(function(row){ return row.map(function(x){ return String(Math.round(x*1e6)/1e6); }); });
+    state.pi=[]; for(var p=0;p<n;p++) state.pi.push(p===0 ? (mode==='pct'?'100':'1') : '0');
+    buildMatrix(); buildChips(); buildPi(); retintAll();
+    toast('Matriz importada ('+n+'×'+n+', '+(mode==='pct'?'porcentagem':'decimal')+'). Confira os rótulos e a linha inicial π₀.');
+  }
+
+  /* ---------- presets ---------- */
+  var PRESETS={
+    tempo:{ mode:'dec', labels:['Chove','Não chove'],
+      P:[['0.7','0.3'],['0.4','0.6']], pi:['1','0'], gens:8 },
+    empresas:{ mode:'pct', labels:['Empresa A','Empresa B','Empresa C'],
+      P:[['20','60','20'],['60','0','40'],['10','70','20']], pi:['100','0','0'], gens:4 },
+    bikes:{ mode:'pct', labels:['Centro','Orla','Parque'],
+      P:[['90','0','10'],['30','40','30'],['15','55','30']], pi:['100','0','0'], gens:6 },
+    absorvente:{ mode:'dec', labels:['0 (ruína)','1','2','3','4 (meta)'],
+      P:[['1','0','0','0','0'],['0.5','0','0.5','0','0'],['0','0.5','0','0.5','0'],['0','0','0.5','0','0.5'],['0','0','0','0','1']],
+      pi:['0','0','1','0','0'], gens:12 }
+  };
+  function loadPreset(key){
+    var p=PRESETS[key]; if(!p) return;
+    state.mode=p.mode;
+    $('modeDec').setAttribute('aria-pressed', p.mode==='dec');
+    $('modePct').setAttribute('aria-pressed', p.mode==='pct');
+    $('piMode').textContent = p.mode==='pct' ? 'π₀ em %' : 'π₀';
+    state.n=p.labels.length;
+    $('nStates').value=state.n;
+    state.labels=p.labels.slice();
+    state.P=p.P.map(function(r){return r.slice();});
+    state.pi=p.pi.slice();
+    $('gens').value=p.gens;
+    buildMatrix(); buildChips(); buildPi(); retintAll();
+    toast('Exemplo carregado — confira sua resposta com este.');
+  }
+
+  /* ---------- theme ---------- */
+  function initTheme(){
+    $('themeBtn').addEventListener('click',function(){
+      var cur=document.documentElement.getAttribute('data-theme');
+      var sysDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+      var next = cur ? (cur==='dark'?'light':'dark') : (sysDark?'light':'dark');
+      document.documentElement.setAttribute('data-theme',next);
+      retintAll();
+    });
+  }
+
+  /* ---------- wire up ---------- */
+  function init(){
+    state.n=2; state.mode='dec';
+    state.labels=defaultLabels(2);
+    state.P=[['0.7','0.3'],['0.4','0.6']];
+    state.pi=['1','0'];
+    buildMatrix(); buildChips(); buildPi();
+    $('nStates').addEventListener('change',function(){ setN(parseInt(this.value,10)); });
+    $('modeDec').addEventListener('click',function(){ setMode('dec'); });
+    $('modePct').addEventListener('click',function(){ setMode('pct'); });
+    $('preset').addEventListener('change',function(){ if(this.value){ loadPreset(this.value); } });
+    $('importBtn').addEventListener('click',importMatrix);
+    $('runBtn').addEventListener('click',run);
+    $('clearBtn').addEventListener('click',function(){
+      for(var i=0;i<state.n;i++) for(var j=0;j<state.n;j++) state.P[i][j]='0';
+      buildMatrix(); retintAll();
+    });
+    $('fillBtn').addEventListener('click',function(){
+      for(var i=0;i<state.n;i++){ var s=0; for(var j=0;j<state.n-1;j++) s+=toProb(state.P[i][j]);
+        var rem = 1-s; if(rem<0) rem=0;
+        state.P[i][state.n-1] = state.mode==='pct' ? String(Math.round(rem*1e4)/100) : String(Math.round(rem*1e6)/1e6);
+      }
+      buildMatrix(); retintAll(); toast('Última coluna preenchida para fechar cada linha.');
+    });
+    initTheme();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
